@@ -1,0 +1,165 @@
+<html lang = "en">
+    <head>
+        <meta charset="utf-8"/>
+        <!--latest rendering engine -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <!-- auto scale width to various device -->
+        <meta name="viewport" content="width = device-width, initial-scale = 1">
+        <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+        <title>Chat Room FSE 18-652</title>
+        <link rel = "stylesheet" href = "style.css">
+        <style>
+
+            #chatSec{
+                height: 450px;
+                overflow:scroll;
+                overflow-x: hidden;
+            }
+            #chatPanel{
+                display: none;
+            }
+            #userPanel{
+                margin-top: 200px;
+                vertical-align: middle;
+            }
+            #chatWrap{
+                float: left;
+                border: 1px #000 solid;
+                width: 450px;
+            }
+            #chatBoard {
+              list-style-type: none;
+              margin: 0;
+              padding: 0;
+            }
+            #chatBoard li {
+              padding: 2px 5px;
+            }
+
+        </style>
+    </head>
+
+    <body>
+        <div id = "userPanel" class="col-md-4 col-md-offset-4 vertical-center">
+               <h1>FSE Chat Room</h1>
+               <label for="usr">Username:</label> 
+               <p id = "usernameError"></p>
+                <form id="setUsername">
+                    <input type="text" class="form-control" id="username"></input>
+                    <button type="submit" class="btn btn-primary">Enter</button>
+                </form>
+        </div>
+
+        <div id = "chatPanel" class="col-lg-7">
+            <!-- Chat Section-->
+            <div id = "chatWrap" class="panel panel-primary">
+                <div id = "chatTop" class="panel-heading"></div>
+                <div id = "chatSec">
+                    <ul id="chatBoard"></ul>
+                </div>
+
+                <form id="postMessage">
+                    <input type="text" class="form-control" id="message"></input>
+                    <button type="submit" class="btn btn-primary">POST</button>
+                </form>
+            </div>
+
+            <!-- User Section-->
+            <div id = "usersOnline" class="col-md-3">
+
+            </div>
+        </div>
+
+        <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        
+        <script>
+            jQuery(function($){
+                var socket = io.connect();
+
+                var $usernameField = $('#setUsername');
+                var $usernameError = $('#usernameError');
+                var $usernameBuffer = $('#username');
+                var $usersOnline = $('#usersOnline');
+
+                var $messageField = $('#postMessage');
+                var $messageBuffer = $('#message');
+
+                var $chatBoard = $('#chatBoard');
+
+                //Send User Name
+                $usernameField.submit(function(e){
+                    e.preventDefault();
+                    var usernameEntered = $usernameBuffer.val()
+                    socket.emit('new user', usernameEntered, function(data){
+                        if(data){
+                            //data true we can hide user and display chatBoard
+                            $('#userPanel').hide();
+                            $('#chatTop').html('Welcome, logged in as '+ usernameEntered);
+                            $('#chatPanel').show();
+                            scrollToBottom();
+                        }else{
+                            $usernameError.html('<div class="alert alert-danger">User Name Already Exist</div>');
+                        }
+
+                    });
+                    $usernameBuffer.val('');
+                    //Reset buffer
+                });
+
+                //Username update emitted from server
+                socket.on('update usernames',function(data){
+                    var html = '';
+                    for(var i=0; i < data.length; i++){
+                        html += ( data[i] + "<br>");
+                    }
+                    $usersOnline.html( '<br><span class="label label-success">Online Users</span><br><br>' + html);
+                });
+
+                //Send out message
+                $messageField.submit(function(e){
+                    e.preventDefault();
+                    socket.emit('send message', $messageBuffer.val());
+                    $messageBuffer.val('');
+                    //Reset buffer after per use
+                });
+
+                function displayMessage(data)
+                {
+                    var currTime = data.timestamp;
+                    var userAndTime =   '<div class="col-sm-8 text-primary">' + data.user + '</div>' +
+                                        '<div class="col-sm-4">' + currTime + '</div>';
+                    var chatEntity = userAndTime + 
+                                     '<p class="bg-info">'+ data.msg +'</p>';
+                    $chatBoard.append('<li>' + chatEntity + '</li>')
+                    scrollToBottom();
+                }
+
+                function scrollToBottom(){
+                    var element = document.getElementById("chatSec");
+                    element.scrollTop = element.scrollHeight;
+                }
+
+                //Retrieve Previous Messages when log in 
+                socket.on('loading previous msg',function(data){
+                    console.log("Historical msg size: " + data.length);
+                    for(var i=0; i<data.length; i++){
+                        displayMessage(data[i]);
+                    }
+                });
+
+                //Receive Message
+                socket.on('new message', function(data){
+                    //console.log('Received data: ' + data);
+                    displayMessage(data);
+                });
+            });
+
+        </script>
+
+    </body>
+</html>
